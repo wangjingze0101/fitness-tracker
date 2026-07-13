@@ -4,7 +4,7 @@ import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Sun, Moon, Monitor, Dumbbell, LogOut, User as UserIcon } from "lucide-react";
+import { Sun, Moon, Monitor, Dumbbell, LogOut, User as UserIcon, Pencil, Check, X } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageTransition } from "@/components/shared/page-transition";
 import { fetchMe, logout } from "@/lib/api";
@@ -13,9 +13,22 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [saving, setSaving] = useState(false);
   const router = useRouter();
 
-  useEffect(() => { setMounted(true); fetchMe().then(d => setUser(d.user)); }, []);
+  useEffect(() => { setMounted(true); fetchMe().then(d => { setUser(d.user); if(d.user) setNewName(d.user.name); }); }, []);
+
+  async function handleSaveName() {
+    if (!newName.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/auth/profile", { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ name: newName.trim() }), credentials: "include" });
+      const d = await res.json();
+      if (d.user) setUser(d.user);
+    } catch {} finally { setSaving(false); setEditing(false); }
+  }
 
   async function handleLogout() {
     await logout();
@@ -41,10 +54,30 @@ export default function SettingsPage() {
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                 <UserIcon className="w-5 h-5 text-primary" />
               </div>
-              <div>
-                <p className="font-medium text-foreground">{user.name}</p>
-                <p className="text-xs text-muted-foreground">{user.email}</p>
-              </div>
+              {editing ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <input
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    autoFocus
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSaveName(); if (e.key === "Escape") setEditing(false); }}
+                  />
+                  <motion.button whileTap={{scale:0.9}} onClick={handleSaveName} disabled={saving} className="p-1.5 rounded-lg bg-primary text-primary-foreground"><Check className="w-4 h-4" /></motion.button>
+                  <motion.button whileTap={{scale:0.9}} onClick={() => setEditing(false)} className="p-1.5 rounded-lg bg-muted"><X className="w-4 h-4" /></motion.button>
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-between" onClick={() => { setNewName(user.name); setEditing(true); }}>
+                  <div>
+                    <p className="font-medium text-foreground">{user.name}</p>
+                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                  </div>
+                  <motion.button whileTap={{scale:0.9}} onClick={() => { setNewName(user.name); setEditing(true); }} className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+                    <Pencil className="w-4 h-4" />
+                  </motion.button>
+                </div>
+              )}
             </div>
             <motion.button
               whileTap={{ scale: 0.97 }}
