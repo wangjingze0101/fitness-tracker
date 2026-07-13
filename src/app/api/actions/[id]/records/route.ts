@@ -1,32 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as storage from "@/lib/storage";
+import { getUserIdFromRequest } from "@/lib/auth";
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) return NextResponse.json({ error: "请先登录" }, { status: 401 });
   try {
     const { id } = await params;
-    const records = await storage.getRecordsByAction(id);
+    const records = await storage.getRecordsByAction(userId, id);
     return NextResponse.json({ records });
-  } catch (error) {
-    console.error("获取历史记录失败:", error);
-    return NextResponse.json({ error: "获取历史记录失败" }, { status: 500 });
-  }
+  } catch (e) { console.error(e); return NextResponse.json({ error: "获取失败" }, { status: 500 }); }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await getUserIdFromRequest(req);
+  if (!userId) return NextResponse.json({ error: "请先登录" }, { status: 401 });
   try {
     const { id } = await params;
-    const { date, sets, reps } = await request.json();
+    const { date, sets, reps } = await req.json();
     if (!date) return NextResponse.json({ error: "日期不能为空" }, { status: 400 });
-    const log = await storage.upsertRecord(id, date, sets ?? 0, reps ?? 0);
+    const log = await storage.upsertRecord(userId, id, date, sets ?? 0, reps ?? 0);
     return NextResponse.json({ log });
-  } catch (error) {
-    console.error("更新训练记录失败:", error);
-    return NextResponse.json({ error: "更新训练记录失败" }, { status: 500 });
-  }
+  } catch (e) { console.error(e); return NextResponse.json({ error: "更新失败" }, { status: 500 }); }
 }

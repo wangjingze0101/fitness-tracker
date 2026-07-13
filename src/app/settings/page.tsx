@@ -1,17 +1,26 @@
 "use client";
 
 import { useTheme } from "next-themes";
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Sun, Moon, Monitor, Dumbbell, Github } from "lucide-react";
+import { Sun, Moon, Monitor, Dumbbell, LogOut, User as UserIcon } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageTransition } from "@/components/shared/page-transition";
+import { fetchMe, logout } from "@/lib/api";
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+  const router = useRouter();
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => { setMounted(true); fetchMe().then(d => setUser(d.user)); }, []);
+
+  async function handleLogout() {
+    await logout();
+    router.push("/login");
+  }
 
   if (!mounted) return null;
 
@@ -24,7 +33,31 @@ export default function SettingsPage() {
   return (
     <AppShell title="设置">
       <PageTransition>
-        {/* 主题设置 */}
+        {/* 用户信息 */}
+        {user && (
+          <div className="rounded-2xl bg-card border border-border p-5 mb-4">
+            <h3 className="text-sm font-semibold mb-3">账号信息</h3>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <UserIcon className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium text-foreground">{user.name}</p>
+                <p className="text-xs text-muted-foreground">{user.email}</p>
+              </div>
+            </div>
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={handleLogout}
+              className="w-full mt-4 py-2.5 rounded-xl border border-red-200 dark:border-red-800 text-red-500 text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              退出登录
+            </motion.button>
+          </div>
+        )}
+
+        {/* 主题 */}
         <div className="rounded-2xl bg-card border border-border p-5 mb-4">
           <h3 className="text-sm font-semibold mb-4">外观</h3>
           <div className="flex gap-2">
@@ -37,9 +70,7 @@ export default function SettingsPage() {
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setTheme(opt.value)}
                   className={`flex-1 flex flex-col items-center gap-2 py-3 rounded-xl border transition-all ${
-                    isActive
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-border text-muted-foreground hover:bg-muted"
+                    isActive ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:bg-muted"
                   }`}
                 >
                   <Icon className="w-5 h-5" />
@@ -63,13 +94,8 @@ export default function SettingsPage() {
             </div>
           </div>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            一款简洁、美观的健身打卡应用，帮助你记录每日训练，追踪身体变化，养成运动习惯。
+            一款简洁、美观的健身打卡应用，帮助你记录每日训练，追踪身体变化，养成运动习惯。每人独立账号，数据安全隔离。
           </p>
-          <div className="mt-4 pt-4 border-t border-border">
-            <p className="text-xs text-muted-foreground">
-              技术栈：Next.js + TypeScript + Tailwind CSS + Prisma + SQLite
-            </p>
-          </div>
         </div>
       </PageTransition>
     </AppShell>
