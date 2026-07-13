@@ -10,6 +10,12 @@ let tablesReady = false;
 async function ensureTables() {
   if (tablesReady) return;
   try {
+    // 删除旧表（无 user_id 的旧版本）
+    await sql`DROP TABLE IF EXISTS workout_records CASCADE`;
+    await sql`DROP TABLE IF EXISTS actions CASCADE`;
+    await sql`DROP TABLE IF EXISTS body_metrics CASCADE`;
+    await sql`DROP TABLE IF EXISTS users CASCADE`;
+
     await sql`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
