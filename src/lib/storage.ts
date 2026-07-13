@@ -1,240 +1,212 @@
 /**
- * Supabase 数据库存储层
- * 使用 PostgreSQL 数据库，支持云端部署和数据持久化
+ * Vercel Postgres 数据库存储层
+ * 部署到 Vercel 后自动使用，首次请求自动建表
  */
 
-import { supabase, TABLES } from "./supabase";
+import { sql } from "@vercel/postgres";
+
+// ========== 自动建表（首次使用自动执行） ==========
+
+let tablesReady = false;
+
+async function ensureTables() {
+  if (tablesReady) return;
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS actions (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS workout_records (
+        id TEXT PRIMARY KEY,
+        action_id TEXT NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        sets INTEGER DEFAULT 0,
+        reps INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(action_id, date)
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS body_metrics (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL UNIQUE,
+        weight REAL,
+        height REAL,
+        note TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+    tablesReady = true;
+  } catch (err) {
+    console.error("建表失败:", err);
+  }
+}
 
 // ========== ID 生成 ==========
 
-function generateId(): string {
+function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
 
-// ========== Actions API ==========
+// ========== Actions ==========
 
 export async function getActions() {
-  const { data, error } = await supabase
-    .from(TABLES.ACTIONS)
-    .select("*")
-    .order("sort_order", { ascending: true });
-
-  if (error) throw error;
-  return data.map(mapAction);
+  await ensureTables();
+  const { rows } = await sql`SELECT * FROM actions ORDER BY sort_order ASC`;
+  return rows.map(mapAction);
 }
 
 export async function getActionById(id: string) {
-  const { data, error } = await supabase
-    .from(TABLES.ACTIONS)
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (error && error.code !== "PGRST116") throw error;
-  return data ? mapAction(data) : undefined;
+  await ensureTables();
+  const { rows } = await sql`SELECT * FROM actions WHERE id = ${id}`;
+  return rows[0] ? mapAction(rows[0]) : undefined;
 }
 
 export async function createAction(name: string) {
-  // 获取最大 sortOrder
-  const { data: existing } = await supabase
-    .from(TABLES.ACTIONS)
-    .select("sort_order")
-    .order("sort_order", { ascending: false })
-    .limit(1);
-
-  const maxOrder = (existing?.[0]?.sort_order ?? -1) + 1;
-
-  const { data, error } = await supabase
-    .from(TABLES.ACTIONS)
-    .insert({ id: generateId(), name: name.trim(), sort_order: maxOrder })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return mapAction(data);
+  await ensureTables();
+  const { rows: existing } = await sql`SELECT sort_order FROM actions ORDER BY sort_order DESC LIMIT 1`;
+  const sortOrder = (existing[0]?.sort_order ?? -1) + 1;
+  const id = genId();
+  const { rows } = await sql`
+    INSERT INTO actions (id, name, sort_order) VALUES (${id}, ${name.trim()}, ${sortOrder})
+    RETURNING *
+  `;
+  return mapAction(rows[0]);
 }
 
 export async function updateAction(id: string, name: string) {
-  const { data, error } = await supabase
-    .from(TABLES.ACTIONS)
-    .update({ name: name.trim() })
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data ? mapAction(data) : null;
+  await ensureTables();
+  const { rows } = await sql`
+    UPDATE actions SET name = ${name.trim()} WHERE id = ${id} RETURNING *
+  `;
+  return rows[0] ? mapAction(rows[0]) : null;
 }
 
 export async function deleteAction(id: string): Promise<boolean> {
-  const { error } = await supabase
-    .from(TABLES.ACTIONS)
-    .delete()
-    .eq("id", id);
-
-  // 注意：workout_records 设置了 ON DELETE CASCADE，会自动删除
-  return !error;
+  await ensureTables();
+  const { rowCount } = await sql`DELETE FROM actions WHERE id = ${id}`;
+  return (rowCount ?? 0) > 0;
 }
 
 export async function reorderActions(orderedIds: string[]) {
+  await ensureTables();
   for (let i = 0; i < orderedIds.length; i++) {
-    await supabase
-      .from(TABLES.ACTIONS)
-      .update({ sort_order: i })
-      .eq("id", orderedIds[i]);
+    await sql`UPDATE actions SET sort_order = ${i} WHERE id = ${orderedIds[i]}`;
   }
   return true;
 }
 
-// ========== Workout Records API ==========
+// ========== Workout Records ==========
 
 export async function getRecordsByAction(actionId: string) {
-  const { data, error } = await supabase
-    .from(TABLES.WORKOUT_RECORDS)
-    .select("*")
-    .eq("action_id", actionId)
-    .order("date", { ascending: false });
-
-  if (error) throw error;
-  return data.map(mapRecord);
+  await ensureTables();
+  const { rows } = await sql`
+    SELECT * FROM workout_records WHERE action_id = ${actionId} ORDER BY date DESC
+  `;
+  return rows.map(mapRecord);
 }
 
 export async function getTodayRecord(actionId: string, date: string) {
-  const { data, error } = await supabase
-    .from(TABLES.WORKOUT_RECORDS)
-    .select("*")
-    .eq("action_id", actionId)
-    .eq("date", date)
-    .maybeSingle();
-
-  if (error && error.code !== "PGRST116") throw error;
-  return data ? mapRecord(data) : undefined;
+  await ensureTables();
+  const { rows } = await sql`
+    SELECT * FROM workout_records WHERE action_id = ${actionId} AND date = ${date}
+  `;
+  return rows[0] ? mapRecord(rows[0]) : undefined;
 }
 
-export async function upsertRecord(
-  actionId: string,
-  date: string,
-  sets: number,
-  reps: number = 0
-) {
-  // 先查是否存在
+export async function upsertRecord(actionId: string, date: string, sets: number, reps = 0) {
+  await ensureTables();
   const existing = await getTodayRecord(actionId, date);
-
   if (existing) {
-    const { data, error } = await supabase
-      .from(TABLES.WORKOUT_RECORDS)
-      .update({ sets, reps })
-      .eq("id", existing.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return mapRecord(data);
+    const { rows } = await sql`
+      UPDATE workout_records SET sets = ${sets}, reps = ${reps} WHERE id = ${existing.id} RETURNING *
+    `;
+    return mapRecord(rows[0]);
   }
-
-  const { data, error } = await supabase
-    .from(TABLES.WORKOUT_RECORDS)
-    .insert({
-      id: generateId(),
-      action_id: actionId,
-      date,
-      sets,
-      reps,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return mapRecord(data);
+  const { rows } = await sql`
+    INSERT INTO workout_records (id, action_id, date, sets, reps)
+    VALUES (${genId()}, ${actionId}, ${date}, ${sets}, ${reps})
+    RETURNING *
+  `;
+  return mapRecord(rows[0]);
 }
 
 export async function deleteRecord(actionId: string, date: string): Promise<boolean> {
-  const { error } = await supabase
-    .from(TABLES.WORKOUT_RECORDS)
-    .delete()
-    .eq("action_id", actionId)
-    .eq("date", date);
-
-  return !error;
+  await ensureTables();
+  const { rowCount } = await sql`
+    DELETE FROM workout_records WHERE action_id = ${actionId} AND date = ${date}
+  `;
+  return (rowCount ?? 0) > 0;
 }
 
 export async function getRecordsByDate(date: string) {
-  const { data, error } = await supabase
-    .from(TABLES.WORKOUT_RECORDS)
-    .select("*, actions!inner(name)")
-    .eq("date", date);
-
-  if (error) throw error;
-  return data.map((r: Record<string, unknown>) => ({
+  await ensureTables();
+  const { rows } = await sql`
+    SELECT wr.*, a.name as action_name FROM workout_records wr
+    JOIN actions a ON wr.action_id = a.id
+    WHERE wr.date = ${date}
+  `;
+  return rows.map((r) => ({
     ...mapRecord(r),
-    actionName: (r.actions as { name: string })?.name ?? "未知动作",
+    actionName: r.action_name as string,
   }));
 }
 
 export async function getAllRecords() {
-  const { data, error } = await supabase
-    .from(TABLES.WORKOUT_RECORDS)
-    .select("*");
-
-  if (error) throw error;
-  return data.map(mapRecord);
+  await ensureTables();
+  const { rows } = await sql`SELECT * FROM workout_records`;
+  return rows.map(mapRecord);
 }
 
 export async function getActionTotalSets(actionId: string): Promise<number> {
-  const { data, error } = await supabase
-    .from(TABLES.WORKOUT_RECORDS)
-    .select("sets")
-    .eq("action_id", actionId);
-
-  if (error) throw error;
-  return data.reduce((sum: number, r: { sets: number }) => sum + r.sets, 0);
+  await ensureTables();
+  const { rows } = await sql`
+    SELECT COALESCE(SUM(sets), 0) as total FROM workout_records WHERE action_id = ${actionId}
+  `;
+  return parseInt(rows[0]?.total as string) || 0;
 }
 
 export async function getActionTotalReps(actionId: string): Promise<number> {
-  const { data, error } = await supabase
-    .from(TABLES.WORKOUT_RECORDS)
-    .select("reps")
-    .eq("action_id", actionId);
-
-  if (error) throw error;
-  return data.reduce((sum: number, r: { reps: number }) => sum + r.reps, 0);
+  await ensureTables();
+  const { rows } = await sql`
+    SELECT COALESCE(SUM(reps), 0) as total FROM workout_records WHERE action_id = ${actionId}
+  `;
+  return parseInt(rows[0]?.total as string) || 0;
 }
 
 export async function getLastWorkoutBefore(actionId: string, date: string) {
-  const { data, error } = await supabase
-    .from(TABLES.WORKOUT_RECORDS)
-    .select("*")
-    .eq("action_id", actionId)
-    .lt("date", date)
-    .order("date", { ascending: false })
-    .limit(1);
-
-  if (error) throw error;
-  return data[0] ? mapRecord(data[0]) : undefined;
+  await ensureTables();
+  const { rows } = await sql`
+    SELECT * FROM workout_records
+    WHERE action_id = ${actionId} AND date < ${date}
+    ORDER BY date DESC LIMIT 1
+  `;
+  return rows[0] ? mapRecord(rows[0]) : undefined;
 }
 
 export async function getActionYearRecords(actionId: string, year: number) {
-  const { data, error } = await supabase
-    .from(TABLES.WORKOUT_RECORDS)
-    .select("*")
-    .eq("action_id", actionId)
-    .gte("date", `${year}-01-01`)
-    .lte("date", `${year}-12-31`);
-
-  if (error) throw error;
-  return data.map(mapRecord);
+  await ensureTables();
+  const { rows } = await sql`
+    SELECT * FROM workout_records
+    WHERE action_id = ${actionId} AND date >= ${`${year}-01-01`} AND date <= ${`${year}-12-31`}
+  `;
+  return rows.map(mapRecord);
 }
 
-// ========== Body Metrics API ==========
+// ========== Body Metrics ==========
 
 export async function getBodyMetrics() {
-  const { data, error } = await supabase
-    .from(TABLES.BODY_METRICS)
-    .select("*")
-    .order("date", { ascending: false });
-
-  if (error) throw error;
-  return data.map(mapBodyMetric);
+  await ensureTables();
+  const { rows } = await sql`SELECT * FROM body_metrics ORDER BY date DESC`;
+  return rows.map(mapBody);
 }
 
 export async function upsertBodyMetric(input: {
@@ -243,113 +215,75 @@ export async function upsertBodyMetric(input: {
   height?: number | null;
   note?: string | null;
 }) {
-  const existing = await getBodyMetricByDate(input.date);
-
-  if (existing) {
-    const updates: Record<string, unknown> = {};
-    if (input.weight !== undefined) updates.weight = input.weight;
-    if (input.height !== undefined) updates.height = input.height;
-    if (input.note !== undefined) updates.note = input.note;
-
-    const { data, error } = await supabase
-      .from(TABLES.BODY_METRICS)
-      .update(updates)
-      .eq("id", existing.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return mapBodyMetric(data);
+  await ensureTables();
+  const { rows: existing } = await sql`SELECT * FROM body_metrics WHERE date = ${input.date}`;
+  if (existing[0]) {
+    const { rows } = await sql`
+      UPDATE body_metrics
+      SET weight = COALESCE(${input.weight ?? null}, weight),
+          height = COALESCE(${input.height ?? null}, height),
+          note = COALESCE(${input.note ?? null}, note)
+      WHERE id = ${existing[0].id as string}
+      RETURNING *
+    `;
+    return mapBody(rows[0]);
   }
-
-  const { data, error } = await supabase
-    .from(TABLES.BODY_METRICS)
-    .insert({
-      id: generateId(),
-      date: input.date,
-      weight: input.weight ?? null,
-      height: input.height ?? null,
-      note: input.note ?? null,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return mapBodyMetric(data);
+  const { rows } = await sql`
+    INSERT INTO body_metrics (id, date, weight, height, note)
+    VALUES (${genId()}, ${input.date}, ${input.weight ?? null}, ${input.height ?? null}, ${input.note ?? null})
+    RETURNING *
+  `;
+  return mapBody(rows[0]);
 }
 
 export async function updateBodyMetric(
   id: string,
   input: { weight?: number | null; height?: number | null; note?: string | null }
 ) {
-  const updates: Record<string, unknown> = {};
-  if (input.weight !== undefined) updates.weight = input.weight;
-  if (input.height !== undefined) updates.height = input.height;
-  if (input.note !== undefined) updates.note = input.note;
-
-  const { data, error } = await supabase
-    .from(TABLES.BODY_METRICS)
-    .update(updates)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data ? mapBodyMetric(data) : null;
+  await ensureTables();
+  const { rows } = await sql`
+    UPDATE body_metrics
+    SET weight = COALESCE(${input.weight ?? null}, weight),
+        height = COALESCE(${input.height ?? null}, height),
+        note = COALESCE(${input.note ?? null}, note)
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  return rows[0] ? mapBody(rows[0]) : null;
 }
 
 export async function deleteBodyMetric(id: string): Promise<boolean> {
-  const { error } = await supabase
-    .from(TABLES.BODY_METRICS)
-    .delete()
-    .eq("id", id);
-
-  return !error;
+  await ensureTables();
+  const { rowCount } = await sql`DELETE FROM body_metrics WHERE id = ${id}`;
+  return (rowCount ?? 0) > 0;
 }
 
-async function getBodyMetricByDate(date: string) {
-  const { data, error } = await supabase
-    .from(TABLES.BODY_METRICS)
-    .select("*")
-    .eq("date", date)
-    .maybeSingle();
+// ========== 字段映射 ==========
 
-  if (error && error.code !== "PGRST116") throw error;
-  return data ? mapBodyMetric(data) : undefined;
-}
-
-// ========== 映射函数：db 字段 → 前端字段 ==========
-
-function mapAction(row: Record<string, unknown>) {
+function mapAction(r: Record<string, unknown>) {
   return {
-    id: row.id as string,
-    name: row.name as string,
-    sortOrder: row.sort_order as number,
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
+    id: r.id as string, name: r.name as string,
+    sortOrder: r.sort_order as number,
+    createdAt: String(r.created_at ?? ""),
+    updatedAt: String(r.updated_at ?? ""),
   };
 }
 
-function mapRecord(row: Record<string, unknown>) {
+function mapRecord(r: Record<string, unknown>) {
   return {
-    id: row.id as string,
-    actionId: row.action_id as string,
-    date: row.date as string,
-    sets: row.sets as number,
-    reps: row.reps as number,
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
+    id: r.id as string, actionId: r.action_id as string,
+    date: r.date as string, sets: r.sets as number, reps: r.reps as number,
+    createdAt: String(r.created_at ?? ""),
+    updatedAt: String(r.updated_at ?? ""),
   };
 }
 
-function mapBodyMetric(row: Record<string, unknown>) {
+function mapBody(r: Record<string, unknown>) {
   return {
-    id: row.id as string,
-    date: row.date as string,
-    weight: row.weight as number | null,
-    height: row.height as number | null,
-    note: row.note as string | null,
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
+    id: r.id as string, date: r.date as string,
+    weight: r.weight as number | null, height: r.height as number | null,
+    note: r.note as string | null,
+    createdAt: String(r.created_at ?? ""),
+    updatedAt: String(r.updated_at ?? ""),
   };
 }
