@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "app.vercel.fitness_tracker_flax_kappa.twa",
+    "sha256_cert_fingerprints": ["3A:10:44:C6:87:BA:6C:13:D4:5F:33:48:18:27:21:C7:CE:8E:1D:19:85:79:2D:EA:A1:80:F5:B7:E2:C3:E0:2F"]
+  }
+}]
