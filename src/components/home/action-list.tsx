@@ -58,7 +58,7 @@ function SortableItem({ action, index, children }: { action: ActionWithToday; in
   );
 }
 
-export function ActionList({ actions, onReorder, onEdit, onDelete }: ActionListProps) {
+export function ActionList({ actions, onReorder, onEdit, onDelete, onQuickAdd }: ActionListProps) {
   const [items, setItems] = useState(actions);
 
   // 当外部 actions 变化时同步
