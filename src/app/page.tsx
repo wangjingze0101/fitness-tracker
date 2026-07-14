@@ -54,7 +54,7 @@ export default function HomePage() {
   }
 
   return (
-    <PageTransition>
+    <PageTransition className="pb-20">
       {/* 顶部概览卡片 */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
