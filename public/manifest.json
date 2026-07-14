@@ -1,28 +1,25 @@
 {
+  "id": "fitness-tracker-app",
   "name": "健身打卡 - 记录你的每一次训练",
   "short_name": "健身打卡",
   "description": "简洁美观的健身打卡应用，记录每日训练，追踪身体变化",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#16a34a",
   "lang": "zh-CN",
+  "dir": "ltr",
   "scope": "/",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "screenshots": [
-    {
-      "src": "/screenshot-mobile.png",
-      "sizes": "1080x1920",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "首页"
-    }
+    { "src": "/screenshot-mobile.png", "sizes": "1080x1920", "type": "image/png", "form_factor": "narrow", "label": "首页" }
   ],
-  "categories": ["health", "fitness", "lifestyle"]
+  "categories": ["health", "fitness", "lifestyle"],
+  "iarc_rating_id": "e10d03f9-0f69-4d48-b9ed-1f4b7e0e93b8"
 }
