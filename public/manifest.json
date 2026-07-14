@@ -1,0 +1,13 @@
+{
+  "name": "健身打卡",
+  "short_name": "健身打卡",
+  "description": "记录你的每一次训练",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#16a34a",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
