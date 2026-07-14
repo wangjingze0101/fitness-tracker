@@ -22,7 +22,9 @@ export async function GET(request: NextRequest) {
         createdAt: action.createdAt, updatedAt: action.updatedAt,
         todaySets: todayRecord?.sets ?? 0, todayReps: todayRecord?.reps ?? 0,
         totalSets, totalReps,
-        lastWorkoutDate: lastRecord?.date ?? null, lastWorkoutSets: lastRecord?.sets ?? null,
+        lastWorkoutDate: lastRecord?.date ?? null,
+        lastWorkoutSets: lastRecord?.sets ?? null,
+        lastWorkoutReps: lastRecord?.reps ?? 0,
         logId: todayRecord?.id ?? null,
       };
     }));

@@ -15,6 +15,7 @@ export interface ActionWithToday extends Action {
   totalReps: number;
   lastWorkoutDate: string | null;
   lastWorkoutSets: number | null;
+  lastWorkoutReps: number;
   logId: string | null;
 }
 

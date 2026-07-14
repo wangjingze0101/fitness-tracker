@@ -38,7 +38,8 @@ export default function CheckInPage() {
       if (found) {
         setAction(found);
         setSets(found.todaySets);
-        setReps(found.todayReps);
+        // 今天还没打过卡 → 沿用昨天的个数
+        setReps(found.todaySets === 0 && found.lastWorkoutReps > 0 ? found.lastWorkoutReps : found.todayReps);
       }
     } catch {
       // ignore

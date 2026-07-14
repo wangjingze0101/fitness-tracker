@@ -46,6 +46,13 @@ export default function HomePage() {
     await remove(id);
   }
 
+  async function handleQuickAdd(action: ActionWithToday) {
+    // 乐观更新：立即 +1 组
+    const newSets = action.todaySets + 1;
+    await api.upsertTodayRecord(action.id, newSets, action.todayReps);
+    await load();
+  }
+
   return (
     <PageTransition>
       {/* 顶部概览卡片 */}
@@ -115,6 +122,7 @@ export default function HomePage() {
           onReorder={reorder}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onQuickAdd={handleQuickAdd}
         />
       )}
 

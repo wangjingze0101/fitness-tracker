@@ -43,6 +43,19 @@ export function SetCounter({ sets, reps, onSetsChange, onRepsChange }: SetCounte
             <Plus className="w-6 h-6" />
           </motion.button>
         </div>
+        {/* 快捷组数 */}
+        <div className="flex gap-2 mt-2">
+          {[5, 10].map((n) => (
+            <motion.button
+              key={n}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => onSetsChange(sets + n)}
+              className="px-3 py-1 rounded-lg border border-border bg-card text-xs text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
+            >
+              +{n}
+            </motion.button>
+          ))}
+        </div>
       </div>
 
       {/* 个数计数器 */}
@@ -73,6 +86,19 @@ export function SetCounter({ sets, reps, onSetsChange, onRepsChange }: SetCounte
           >
             <Plus className="w-5 h-5" />
           </motion.button>
+        </div>
+        {/* 快捷个数 */}
+        <div className="flex gap-2 mt-2">
+          {[5, 10].map((n) => (
+            <motion.button
+              key={n}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => onRepsChange(reps + n)}
+              className="px-3 py-1 rounded-lg border border-border bg-card text-xs text-muted-foreground hover:text-foreground hover:border-orange-400/30 transition-colors"
+            >
+              +{n}
+            </motion.button>
+          ))}
         </div>
         <span className="text-xs text-muted-foreground mt-1">次 / 组</span>
       </div>

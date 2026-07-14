@@ -24,6 +24,7 @@ interface ActionListProps {
   onReorder: (orderedIds: string[]) => void;
   onEdit: (action: ActionWithToday) => void;
   onDelete: (id: string) => void;
+  onQuickAdd: (action: ActionWithToday) => void;
 }
 
 function SortableItem({ action, index, children }: { action: ActionWithToday; index: number; children: React.ReactNode }) {
@@ -97,7 +98,7 @@ export function ActionList({ actions, onReorder, onEdit, onDelete }: ActionListP
         <div className="space-y-2">
           {items.map((action, i) => (
             <SortableItem key={action.id} action={action} index={i}>
-              <ActionCard action={action} index={i} onEdit={onEdit} onDelete={onDelete} />
+              <ActionCard action={action} index={i} onEdit={onEdit} onDelete={onDelete} onQuickAdd={onQuickAdd} />
             </SortableItem>
           ))}
         </div>
