@@ -1,26 +1,40 @@
-// Service Worker for PWA — 网络优先策略
-const CACHE = "fitness-v2";
+// Service Worker — PWA offline support
+const V = "fitness-v3";
 
-self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("install", (e) => {
+  self.skipWaiting();
+});
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    )
+    caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
   );
-  self.clients.claim();
+  e.waitUntil(self.clients.claim());
 });
 
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   e.respondWith(
-    fetch(e.request)
-      .then((res) => {
-        const clone = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, clone));
+    (async () => {
+      try {
+        const res = await fetch(e.request);
+        if (res.ok) {
+          const clone = res.clone();
+          const cache = await caches.open(V);
+          cache.put(e.request, clone);
+        }
         return res;
-      })
-      .catch(() => caches.match(e.request))
+      } catch {
+        const cache = await caches.open(V);
+        const cached = await cache.match(e.request);
+        if (cached) return cached;
+        // Offline fallback page
+        if (e.request.mode === "navigate") {
+          const fallback = await cache.match("/");
+          if (fallback) return fallback;
+        }
+        return new Response("Offline", { status: 503 });
+      }
+    })()
   );
 });
